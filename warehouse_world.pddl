@@ -1,8 +1,8 @@
-﻿(define (domain warehouse)
+(define (domain warehouse)
 	(:requirements :typing)
 	(:types robot pallette - bigobject
         	location shipment order saleitem)
-
+        	
   	(:predicates
     	(ships ?s - shipment ?o - order)
     	(orders ?o - order ?si - saleitem)
@@ -12,7 +12,7 @@
     	(includes ?s - shipment ?si - saleitem)
 
     	(free ?r - robot)
-    	(has ?r - robot ?p - pallette)
+    	(has ?r - robot ?p - pallette) ; redundant Don't use
 
     	(packing-location ?l - location)
     	(packing-at ?s - shipment ?l - location)
@@ -26,42 +26,51 @@
   )
 
    (:action startShipment
-      :parameters (?s - shipment ?o - order ?l - location)
-      :precondition (and (unstarted ?s) (not (complete ?s)) (ships ?s ?o) (available ?l) (packing-location ?l))
-      :effect (and (started ?s) (packing-at ?s ?l) (not (unstarted ?s)) (not (available ?l)) )
+        :parameters (?s - shipment ?o - order ?l - location)
+        :precondition (and (unstarted ?s) 
+                    (not (complete ?s)) 
+                    (ships ?s ?o) (available ?l) (packing-location ?l))
+                    
+        :effect (and (started ?s) (packing-at ?s ?l) (not (unstarted ?s)) 
+                (not (available ?l)))
    )
    
-   (:action robotMove 
+   ;; My Code Here:
+   (:action robotMove
         :parameters (?start - location ?end - location ?rob - robot)
-        :precondition (and (at ?rob ?start) (no-robot ?end)
-                       (connected ?start ?end))
+        :precondition (and (no-robot ?end) (at ?rob ?start) (connected ?start ?end))
         :effect (and (not (no-robot ?end)) (no-robot ?start) (at ?rob ?end))
                  
-   )
-   (:action robotMoveWithPallette 
-        :parameters (?start - location ?end - location ?rob - robot ?pal - pallette)
-        :precondition (and (at ?rob ?start) (at ?pal ?start) 
-                      (no-robot ?end) (no-pallette ?end)
-                      (connected ?start ?end) )
-        :effect (and (not (no-pallette ?end)) (not (no-robot ?end)) 
-                (no-robot ?start) (no-pallette ?start)
-                 (at ?rob ?end) (at ?pal ?end))
+    )
+   
+   (:action robotMoveWithPallette
+        :parameters (?start - location ?end - location
+                     ?rob - robot ?pal - pallette)
+        :precondition (and (connected ?start ?end) (no-pallette ?end) (no-robot ?end) (at ?rob ?start) (at ?pal ?start)) ;; [at ?pal ?start] do palletes have locations?
+`            
+        :effect (and (not (no-robot ?end)) (not (at ?rob ?start)) (not (at ?pal ?start)) 
+                (no-robot ?start) (no-pallette ?start) (not (no-pallette ?end)) 
+                (at ?rob ?end) (at ?pal ?end))
+    )
+
+   (:action moveItemFromPalletteToShipment
+        :parameters (?loc - location ?ship - shipment ?pal - pallette 
+                     ?si - saleitem ?order - order)
+                     
+        :precondition (and  (packing-at ?ship ?loc) (at ?pal ?loc) (contains ?pal ?si)      ; shipment already started from startShipment
+                      (orders ?order ?si) (ships ?ship ?order) )
+        
+        :effect (and (not (unstarted ?ship)) (started ?ship) (not (contains ?pal ?si)) (includes ?ship ?si) )
    )
    
-   (:action moveItemFromPalletteToShipment 
-        :parameters (?loc - location ?ship - shipment ?order - order ?si - saleitem ?pal - pallette)
-        :precondition (and (packing-location ?loc) (ships ?ship ?order) (orders ?order ?si)
-                        (contains ?pal ?si) (at ?pal ?loc) (packing-at ?ship ?loc) )
-        :effect (and (not (contains ?pal ?si)) (includes ?ship ?si) )
-   
-   )
-   
-   (:action completeShipment 
-        :parameters (?loc - location ?order - order ?ship - shipment)
-        :precondition (and (started ?ship) (packing-at ?ship ?loc) (not (complete ?ship)))
-        :effect (and (complete ?ship) (available ?loc))
-   
-   )
+   (:action completeShipment
+        :parameters (?ship - shipment ?order - order ?loc - location)
+        
+        :precondition (and (started ?ship) (not (complete ?ship)) 
+                      (ships ?ship ?order) (packing-location ?loc) )
+        
+        :effect (and (complete ?ship) (not (packing-at ?ship ?loc)) (available ?loc)) 
+    )
 
 )
 
