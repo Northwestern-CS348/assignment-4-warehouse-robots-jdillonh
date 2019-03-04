@@ -1,4 +1,4 @@
-(define (problem day2)
+﻿(define (problem day2)
   (:domain warehouse)
   (:objects
     shipment1 - shipment
